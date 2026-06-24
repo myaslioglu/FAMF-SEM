@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAMF-SEM Calculator — Metadata-Only Method Loadings</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --ink:#1c2533; --muted:#6b7686;
+    --line:#e2e7ee; --accent:#2f6fb0; --accent2:#1f9d72; --warn:#c2410c;
+    --pos:#2f6fb0; --neg:#d06868; --chip:#eef3f9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 18px 80px}
+  header.top{margin-bottom:18px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;max-width:780px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(20,30,50,.03)}
+  .card h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .step{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--accent);
+    color:#fff;font-size:12px;align-items:center;justify-content:center;font-weight:600}
+  .hint{color:var(--muted);font-size:12.5px;margin:2px 0 12px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:7px 12px;border-radius:8px;cursor:pointer}
+  button:hover{background:#f0f4f9}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{background:transparent}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:4px 6px;text-align:center}
+  th{background:#f2f6fb;font-weight:600}
+  td.lab{text-align:left;font-weight:600;background:#fafbfd}
+  input[type=text],input[type=number]{font:inherit;border:1px solid var(--line);
+    border-radius:6px;padding:4px 6px;width:100%;text-align:center;background:#fff}
+  .grid-input{width:62px}
+  textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;resize:vertical}
+  .status{font-size:12.5px;padding:6px 10px;border-radius:6px;display:inline-block}
+  .ok{background:#e7f6ef;color:#1f7a55}
+  .err{background:#fdecec;color:#b42318}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:680px){.controls{grid-template-columns:1fr}}
+  .slider-wrap label{font-size:13px;font-weight:600}
+  input[type=range]{width:100%}
+  .kpis{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 4px}
+  .kpi{flex:1;min-width:120px;background:var(--chip);border-radius:10px;padding:10px 12px}
+  .kpi .v{font-size:20px;font-weight:700}
+  .kpi .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.charts{grid-template-columns:1fr}}
+  .chart-box{border:1px solid var(--line);border-radius:10px;padding:10px}
+  .chart-box h3{font-size:12.5px;margin:0 0 6px;color:var(--muted);font-weight:600}
+  .copybar{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  pre.out{background:#0f1726;color:#e6edf6;border-radius:8px;padding:12px;overflow:auto;
+    font-size:12px;line-height:1.45;max-height:300px}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-weight:600;font-size:13px}
+  .scroll{overflow:auto}
+  .small{font-size:11.5px;color:var(--muted)}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:#1c2533;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;
+    opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .footnote{color:var(--muted);font-size:12px;margin-top:18px;line-height:1.6}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:12px}
+  .badge{display:inline-block;background:#e9f6ef;color:#1f7a55;border-radius:20px;
+    padding:1px 10px;font-size:11.5px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>FAMF-SEM Calculator <span class="badge">v2 — eigen signal · GCV · free φ</span></h1>
+    <div class="sub">Computes the fixed method-loading <b>pattern</b> w<sub>i</sub> for a metadata-only
+    Feature-Augmented Method Factor from item design features and the standardized residual
+    correlation matrix of a baseline trait-only CFA. Signal = leading eigenvector of the residual
+    matrix (signed); calibration = ridge regression with intercept, λ chosen by GCV; weights are
+    scaled to Σw<sub>i</sub><sup>2</sup>=k (convention) and fixed in the SEM while the method-factor
+    variance φ is <b>freely estimated</b>. AMOS / LISREL / lavaan ready. Runs entirely in your
+    browser — nothing is uploaded.</div>
+  </header>
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <h2><span class="step">1</span> Item metadata</h2>
+    <div class="hint">One row per item, in the <b>same order</b> as your SEM. Reversed = 0/1, Polarity = +1 (positively keyed) / −1 (negatively keyed), Length = word count. Leave a feature blank/constant and it is ignored automatically.</div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" onclick="loadExample()">Load example (8 items)</button>
+      <button onclick="addRow()">+ Add row</button>
+      <button onclick="clearItems()">Clear</button>
+      <button class="ghost" onclick="toggleImport()">Paste from spreadsheet…</button>
+    </div>
+    <div id="importBox" style="display:none;margin-bottom:10px">
+      <div class="hint">Paste tab- or comma-separated rows: <code>ID, Scale, Reversed, Page, Order, ScaleWidth, Polarity, Length</code> (header row optional).</div>
+      <textarea id="importText" placeholder="y1&#9;ScaleA&#9;0&#9;1&#9;1&#9;5&#9;1&#9;12"></textarea>
+      <div class="row" style="margin-top:6px"><button class="primary" onclick="importItems()">Import</button></div>
+    </div>
+    <div class="scroll">
+      <table id="itemTable"></table>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <h2><span class="step">2</span> Residual correlation matrix</h2>
+    <div class="hint">Paste the <b>k×k standardized residual correlation matrix</b> from your baseline trait-only CFA (same item order). Labels are ignored; the diagonal is not used.</div>
+    <textarea id="matText" placeholder="Paste the residual correlation matrix here (tab/comma/space separated)…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" onclick="parseMatrix()">Parse matrix</button>
+      <span id="matStatus" class="status"></span>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <h2><span class="step">3</span> Calibration</h2>
+    <div class="controls">
+      <div>
+        <label class="slider-wrap" style="display:block;margin-bottom:6px">Residual signal</label>
+        <label style="display:block"><input type="radio" name="sig" value="eigen" checked onchange="recompute()"> Leading eigenvector (signed, recommended)</label>
+        <label style="display:block"><input type="radio" name="sig" value="absmean" onchange="recompute()"> Mean |residual| (magnitude-only fallback)</label>
+        <div class="small" style="margin-top:6px">Under a single method factor the residual matrix is ≈ rank-one (ww<sup>T</sup>), so its leading eigenvector estimates w including signs — required for acquiescence-type effects on balanced scales.</div>
+      </div>
+      <div>
+        <label class="slider-wrap" style="display:block;margin-bottom:6px">Ridge penalty λ</label>
+        <label style="display:block"><input type="radio" name="lammode" value="gcv" checked onchange="recompute()"> Automatic by GCV <span id="gcvLam" class="small"></span></label>
+        <label style="display:block"><input type="radio" name="lammode" value="manual" onchange="recompute()"> Manual:
+          <input type="range" id="lambda" min="-2" max="1.7" step="0.05" value="0" oninput="recompute()" style="vertical-align:middle;width:55%">
+          <span id="lamVal" class="small"></span></label>
+        <label class="slider-wrap" style="display:block;margin-top:10px">
+          Trait factors q (for LISREL): <input type="number" id="qfac" min="1" value="2" style="width:64px" oninput="renderOutputs()">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="card" id="resultsCard" style="display:none">
+    <h2><span class="step">4</span> Results</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="kR2">—</div><div class="l">R² (m̂ vs m)</div></div>
+      <div class="kpi"><div class="v" id="kLam">—</div><div class="l">λ in use</div></div>
+      <div class="kpi"><div class="v" id="kK">—</div><div class="l">items k</div></div>
+      <div class="kpi"><div class="v" id="kG0">—</div><div class="l">intercept γ₀</div></div>
+    </div>
+
+    <div class="charts" style="margin-top:8px">
+      <div class="chart-box">
+        <h3>Feature contributions γ̂ (feature → method weight)</h3>
+        <div id="gammaChart"></div>
+      </div>
+      <div class="chart-box">
+        <h3>Method-weight pattern w<sub>i</sub> (Σw² = k; sign of M arbitrary)</h3>
+        <div id="weightChart"></div>
+      </div>
+    </div>
+    <div class="chart-box" style="margin-top:16px">
+      <h3>λ profile — GCV (orange, left axis, lower is better) and R² (blue, right axis). The marker shows the GCV minimum; the dashed line is the λ in use.</h3>
+      <div id="sweepChart"></div>
+    </div>
+
+    <details open style="margin-top:14px">
+      <summary>Per-item table (encoded features, signal m<sub>i</sub>, final weight w<sub>i</sub>)</summary>
+      <div class="scroll" style="margin-top:8px"><table id="outTable"></table></div>
+    </details>
+
+    <h3 style="margin:18px 0 4px;font-size:14px">Copy-ready output</h3>
+    <div class="hint" style="margin-top:0">In the SEM: fix every M→item loading to w<sub>i</sub>; leave <b>Var(M) free</b> (it estimates the method strength φ); fix Cov(M, trait)=0 for every trait.</div>
+    <div class="copybar">
+      <button onclick="copyText(buildWeightCol())">Copy Final_Weight column</button>
+      <button onclick="copyText(buildAmos())">Copy AMOS loadings</button>
+      <button onclick="copyText(buildLisrel())">Copy LISREL fragment</button>
+      <button onclick="copyText(buildLavaan())">Copy lavaan syntax</button>
+    </div>
+    <details style="margin-top:10px"><summary>AMOS instructions</summary><pre class="out" id="amosOut"></pre></details>
+    <details style="margin-top:10px"><summary>LISREL fragment (all-Y model — note PS, not PH)</summary><pre class="out" id="lisrelOut"></pre></details>
+    <details style="margin-top:10px"><summary>lavaan syntax</summary><pre class="out" id="lavaanOut"></pre></details>
+  </div>
+
+  <div class="footnote">
+    <b>Method.</b> Binary features (Reversed, Polarity) are effects-coded (centered); numeric features
+    (Page, Order, ScaleWidth, Length) are standardized. Signal: m = v₁√max(ℓ₁,0) where (ℓ₁, v₁) is the
+    leading eigenpair of the symmetrized residual correlation matrix (orientation: Σm ≥ 0); fallback:
+    m<sub>i</sub> = mean |r<sup>res</sup><sub>i·</sub>|. Ridge with intercept (unpenalized):
+    γ̂ = (X<sup>T</sup>X + λD)<sup>−1</sup>X<sup>T</sup>m, X = [1 Z], D = diag(0,1,…,1).
+    GCV(λ) = k⁻¹‖(I−H)m‖² / (1 − tr(H)/k)², H = X(X<sup>T</sup>X+λD)<sup>−1</sup>X<sup>T</sup>.
+    Weights w = (γ₀+Zγ̂)·√(k/Σ(γ₀+Zγ̂)²) — scaled, <b>not centered</b>; if the prediction is
+    degenerate the pattern collapses to equal weights (the equal-loading CLF). In the SEM the pattern
+    is fixed and Var(M)=φ is estimated, so the data determine the method strength; φ̂≈0 indicates no
+    detectable design-driven method variance. In LISREL all-Y models the latent covariance matrix is
+    <code>PS</code> (Ψ), not <code>PH</code> (Φ).
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ---------- state ---------- */
+const FEATURES = ["Reversed","Page","Order","ScaleWidth","Polarity","Length"];
+const ENC = ["Reversed_c","Page_z","Order_z","ScaleWidth_z","Polarity_c","Length_z"];
+const CENTERED = {Reversed:true, Polarity:true};
+const LGRID = [0.01,0.03,0.1,0.3,1,3,10,30,50];
+let items = [];
+let R = null;
+let last = null;
+
+/* ---------- linear algebra ---------- */
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
+function sd(a){const m=mean(a);const v=a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length>1?a.length-1:1);return Math.sqrt(v);}
+function pearson(a,b){
+  const ma=mean(a),mb=mean(b);let num=0,da=0,db=0;
+  for(let i=0;i<a.length;i++){num+=(a[i]-ma)*(b[i]-mb);da+=(a[i]-ma)**2;db+=(b[i]-mb)**2;}
+  if(da===0||db===0) return 0;
+  return num/Math.sqrt(da*db);
+}
+function solve(A,b){ // gaussian elimination w/ partial pivoting
+  const n=b.length;
+  const M=A.map((r,i)=>r.slice().concat([b[i]]));
+  for(let c=0;c<n;c++){
+    let piv=c;
+    for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[piv][c])) piv=r;
+    if(Math.abs(M[piv][c])<1e-12) continue;
+    [M[c],M[piv]]=[M[piv],M[c]];
+    const d=M[c][c];
+    for(let j=c;j<=n;j++) M[c][j]/=d;
+    for(let r=0;r<n;r++){ if(r===c) continue; const f=M[r][c];
+      for(let j=c;j<=n;j++) M[r][j]-=f*M[c][j]; }
+  }
+  return M.map(r=>r[n]);
+}
+function inv(A){ // inverse via solves (small p)
+  const n=A.length, I=[];
+  for(let i=0;i<n;i++){const e=Array(n).fill(0);e[i]=1;I.push(solve(A,e));}
+  // I holds columns; transpose
+  const B=Array.from({length:n},()=>Array(n).fill(0));
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++) B[j][i]=I[i][j];
+  return B;
+}
+/* leading eigenpair of symmetric S via shifted power iteration */
+function leadingEig(S){
+  const k=S.length;
+  // shift to make dominant eigenvalue the largest algebraic one
+  let c=0;
+  for(let i=0;i<k;i++){let s=0;for(let j=0;j<k;j++)s+=Math.abs(S[i][j]);c=Math.max(c,s);}
+  let v=Array.from({length:k},(_,i)=>Math.sin(i+1)); // deterministic start
+  let lam=0;
+  for(let it=0;it<500;it++){
+    const u=Array(k).fill(0);
+    for(let i=0;i<k;i++){let s=c*v[i];for(let j=0;j<k;j++)s+=S[i][j]*v[j];u[i]=s;}
+    const nrm=Math.sqrt(u.reduce((s,x)=>s+x*x,0));
+    if(nrm<1e-14) break;
+    const vn=u.map(x=>x/nrm);
+    let diff=0;for(let i=0;i<k;i++)diff=Math.max(diff,Math.abs(Math.abs(vn[i])-Math.abs(v[i])));
+    v=vn;
+    if(diff<1e-12 && it>10) break;
+  }
+  // rayleigh quotient on S
+  let num=0;
+  for(let i=0;i<k;i++){let s=0;for(let j=0;j<k;j++)s+=S[i][j]*v[j];num+=v[i]*s;}
+  lam=num;
+  return {lam, v};
+}
+
+/* ---------- encoding (drops constant columns) ---------- */
+function encode(its){
+  const k=its.length;
+  const Z=[]; for(let i=0;i<k;i++) Z.push([]);
+  const names=[];
+  FEATURES.forEach((f,fi)=>{
+    const col=its.map(it=>Number(it[f]));
+    if(col.some(v=>!isFinite(v))) return;       // incomplete -> skip
+    const m=mean(col);
+    if(CENTERED[f]){
+      if(sd(col)<1e-12) return;                 // constant -> skip
+      for(let i=0;i<k;i++) Z[i].push(col[i]-m);
+    }else{
+      const s=sd(col);
+      if(s<1e-12) return;
+      for(let i=0;i<k;i++) Z[i].push((col[i]-m)/s);
+    }
+    names.push(ENC[fi]);
+  });
+  return {Z,names};
+}
+
+/* ---------- signals ---------- */
+function signalEigen(R){
+  const k=R.length;
+  const S=Array.from({length:k},(_,i)=>Array(k).fill(0));
+  for(let i=0;i<k;i++)for(let j=0;j<k;j++)S[i][j]=(R[i][j]+R[j][i])/2;
+  const {lam,v}=leadingEig(S);
+  const scale=Math.sqrt(Math.max(lam,0));
+  let m=v.map(x=>x*scale);
+  if(m.reduce((s,x)=>s+x,0)<0) m=m.map(x=>-x);
+  return m;
+}
+function signalAbsmean(R,its,crossOnly){
+  const k=R.length;const m=[];
+  for(let i=0;i<k;i++){
+    let s=0,c=0;
+    for(let l=0;l<k;l++){
+      if(l===i) continue;
+      if(crossOnly && its[i].scale && its[l].scale && its[i].scale===its[l].scale) continue;
+      s+=Math.abs(R[i][l]); c++;
+    }
+    m.push(c>0?s/c:0);
+  }
+  return m;
+}
+
+/* ---------- ridge with intercept + GCV ---------- */
+function ridgePath(Z,m){
+  const k=Z.length, p=Z[0].length;
+  // X=[1 Z]
+  const X=Z.map(r=>[1].concat(r));
+  const q=p+1;
+  const XtX=Array.from({length:q},()=>Array(q).fill(0));
+  const Xtm=Array(q).fill(0);
+  for(let a=0;a<q;a++){
+    for(let i=0;i<k;i++) Xtm[a]+=X[i][a]*m[i];
+    for(let b=0;b<q;b++){let s=0;for(let i=0;i<k;i++)s+=X[i][a]*X[i][b];XtX[a][b]=s;}
+  }
+  const ssm=m.reduce((s,x)=>s+(x-mean(m))**2,0);
+  function fitLam(lam){
+    const A=XtX.map((r,i)=>r.map((v,j)=>v+((i===j&&i>0)?lam:0))); // intercept unpenalized
+    const beta=solve(A,Xtm);
+    const Ainv=inv(A);
+    // tr(H) = sum_i x_i' Ainv x_i
+    let trH=0;
+    for(let i=0;i<k;i++){
+      let s=0;
+      for(let a=0;a<q;a++){let t=0;for(let b=0;b<q;b++)t+=Ainv[a][b]*X[i][b];s+=X[i][a]*t;}
+      trH+=s;
+    }
+    const mhat=X.map(r=>r.reduce((s,v,j)=>s+v*beta[j],0));
+    let rss=0;for(let i=0;i<k;i++)rss+=(m[i]-mhat[i])**2;
+    const denom=Math.max(1e-9,(1-trH/k))**2;
+    const gcv=rss/k/denom;
+    const r2=ssm>1e-12?1-rss/ssm:0;
+    return {lam,beta,mhat,gcv,r2,trH};
+  }
+  const path=LGRID.map(fitLam);
+  let best=path[0];
+  path.forEach(f=>{if(f.gcv<best.gcv)best=f;});
+  return {path,best,fitLam};
+}
+function normalizePattern(w_raw){
+  const k=w_raw.length;
+  const ss=w_raw.reduce((s,x)=>s+x*x,0);
+  if(ss<1e-12) return Array(k).fill(1); // degenerate -> CLF pattern
+  const f=Math.sqrt(k/ss);
+  return w_raw.map(x=>x*f);
+}
+
+/* ---------- main compute ---------- */
+function compute(){
+  if(!R || items.length===0) return null;
+  if(R.length!==items.length) return {error:`Matrix is ${R.length}×${R.length} but you have ${items.length} items.`};
+  const sig=document.querySelector('input[name=sig]:checked').value;
+  const lamMode=document.querySelector('input[name=lammode]:checked').value;
+  const {Z,names}=encode(items);
+  if(names.length===0) return {error:"No usable (non-constant, complete) metadata features."};
+  const m=(sig==='eigen')?signalEigen(R):signalAbsmean(R,items,false);
+  const rp=ridgePath(Z,m);
+  let fit;
+  if(lamMode==='gcv'){ fit=rp.best; }
+  else{
+    const lam=Math.pow(10,parseFloat(document.getElementById("lambda").value));
+    fit=rp.fitLam(lam);
+  }
+  const w=normalizePattern(fit.mhat);
+  const r=pearson(m,fit.mhat);
+  return {Z,names,m,w,fit,rp,r,k:items.length,sig,lamMode};
+}
+
+/* ---------- rendering: item table ---------- */
+function renderItemTable(){
+  const t=document.getElementById("itemTable");
+  let h="<tr><th>#</th><th>ItemID</th><th>Scale</th>";
+  FEATURES.forEach(f=>h+=`<th>${f}</th>`);
+  h+="<th></th></tr>";
+  items.forEach((it,i)=>{
+    h+=`<tr><td>${i+1}</td>`;
+    h+=`<td><input type="text" value="${it.id??''}" oninput="edit(${i},'id',this.value)" style="width:64px"></td>`;
+    h+=`<td><input type="text" value="${it.scale??''}" oninput="edit(${i},'scale',this.value)" style="width:72px"></td>`;
+    FEATURES.forEach(f=>{
+      h+=`<td><input class="grid-input" type="number" value="${it[f]??''}" oninput="edit(${i},'${f}',this.value)"></td>`;
+    });
+    h+=`<td><button class="ghost" title="delete" onclick="delRow(${i})">✕</button></td></tr>`;
+  });
+  t.innerHTML=h;
+}
+function edit(i,key,val){ items[i][key]=(key==='id'||key==='scale')?val:(val===''?'':Number(val)); recompute(); }
+function addRow(){ items.push({id:'y'+(items.length+1),scale:'',Reversed:0,Page:1,Order:items.length+1,ScaleWidth:5,Polarity:1,Length:8}); renderItemTable(); recompute(); }
+function delRow(i){ items.splice(i,1); renderItemTable(); recompute(); }
+function clearItems(){ items=[]; renderItemTable(); recompute(); }
+
+/* ---------- import ---------- */
+function toggleImport(){const b=document.getElementById("importBox");b.style.display=b.style.display==='none'?'block':'none';}
+function importItems(){
+  const txt=document.getElementById("importText").value.trim();
+  if(!txt){toast("Nothing to import");return;}
+  const rows=txt.split(/\r?\n/).map(r=>r.split(/\t|,/).map(s=>s.trim())).filter(r=>r.length>=8);
+  const out=[];
+  rows.forEach(r=>{
+    if(isNaN(Number(r[2])) && /rev/i.test(r[2])) return; // header
+    out.push({id:r[0],scale:r[1],Reversed:Number(r[2]),Page:Number(r[3]),Order:Number(r[4]),
+              ScaleWidth:Number(r[5]),Polarity:Number(r[6]),Length:Number(r[7])});
+  });
+  if(out.length===0){toast("Could not parse — check the format");return;}
+  items=out; renderItemTable(); toggleImport(); recompute(); toast(out.length+" items imported");
+}
+
+/* ---------- parse matrix ---------- */
+function parseMatrix(){
+  const txt=document.getElementById("matText").value.trim();
+  const st=document.getElementById("matStatus");
+  if(!txt){st.className="status err";st.textContent="Paste a matrix first.";return;}
+  const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+  const rows=[];
+  for(const line of lines){
+    const toks=line.split(/[\s,;]+/).map(t=>parseFloat(t)).filter(x=>!isNaN(x)&&isFinite(x));
+    if(toks.length) rows.push(toks);
+  }
+  const k=rows.length;
+  if(k<2){st.className="status err";st.textContent="Need at least 2 rows of numbers.";return;}
+  const lens=rows.map(r=>r.length);
+  if(!lens.every(l=>l===k)){
+    st.className="status err";
+    st.textContent=`Detected ${k} rows but row lengths are [${[...new Set(lens)].join(", ")}]. Need a square ${k}×${k} block (remove any index header row/column).`;
+    return;
+  }
+  R=rows;
+  st.className="status ok";
+  st.textContent=`Parsed ${k}×${k} matrix ✓`;
+  recompute();
+}
+
+/* ---------- charts (inline SVG) ---------- */
+function svgBar(data, labels, opts){
+  opts=opts||{};
+  const W=opts.w||440, H=opts.h||200, pad=opts.pad||{l:34,r:8,t:8,b:46};
+  const iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
+  const maxv=Math.max(0.0001,...data.map(v=>Math.abs(v)));
+  const hasNeg=data.some(v=>v<0);
+  const baseY = hasNeg ? pad.t+ih/2 : pad.t+ih;
+  const scale = hasNeg ? (ih/2)/maxv : ih/maxv;
+  const bw=iw/data.length;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" font-family="inherit" font-size="10">`;
+  s+=`<line x1="${pad.l}" y1="${baseY}" x2="${W-pad.r}" y2="${baseY}" stroke="#c8d1dc"/>`;
+  data.forEach((v,i)=>{
+    const x=pad.l+i*bw+bw*0.15, w=bw*0.7;
+    const hgt=Math.abs(v)*scale;
+    const y=v>=0?baseY-hgt:baseY;
+    const col=v>=0?'var(--pos)':'var(--neg)';
+    s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5,hgt).toFixed(1)}" fill="${col}" rx="2"><title>${labels[i]}: ${v.toFixed(3)}</title></rect>`;
+    s+=`<text x="${(x+w/2).toFixed(1)}" y="${H-pad.b+12}" text-anchor="end" transform="rotate(-40 ${(x+w/2).toFixed(1)} ${H-pad.b+12})" fill="#6b7686">${labels[i]}</text>`;
+  });
+  s+=`<text x="4" y="${pad.t+8}" fill="#9aa6b4">${maxv.toFixed(2)}</text>`;
+  if(hasNeg) s+=`<text x="4" y="${(baseY+4).toFixed(1)}" fill="#9aa6b4">0</text>`;
+  s+=`</svg>`;
+  return s;
+}
+function svgLamProfile(path, lamUsed, lamBest){
+  const W=900,H=230,pad={l:52,r:52,t:14,b:36};
+  const iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
+  const lx=l=>Math.log10(l);
+  const xs=path.map(d=>lx(d.lam));
+  const xmin=Math.min(...xs), xmax=Math.max(...xs);
+  const X=l=>pad.l+iw*((lx(l)-xmin)/(xmax-xmin));
+  const gmax=Math.max(...path.map(d=>d.gcv)), gmin=Math.min(...path.map(d=>d.gcv));
+  const Yg=g=>pad.t+ih*(1-(g-gmin)/Math.max(1e-12,gmax-gmin))*0.92;
+  const Yr=r2=>pad.t+ih*(1-Math.max(0,Math.min(1,r2)));
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" font-family="inherit" font-size="11">`;
+  for(let g=0;g<=4;g++){const y=pad.t+ih*g/4;
+    s+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#eef2f7"/>`;
+    s+=`<text x="${W-pad.r+6}" y="${y+3}" fill="var(--pos)">${(1-g/4).toFixed(2)}</text>`;}
+  // GCV curve
+  let pg="";
+  path.forEach((d,i)=>{pg+=(i?"L":"M")+X(d.lam).toFixed(1)+" "+Yg(d.gcv).toFixed(1)+" ";});
+  s+=`<path d="${pg}" fill="none" stroke="var(--warn)" stroke-width="2"/>`;
+  path.forEach(d=>{s+=`<circle cx="${X(d.lam).toFixed(1)}" cy="${Yg(d.gcv).toFixed(1)}" r="3" fill="var(--warn)"><title>λ=${d.lam}: GCV=${d.gcv.toExponential(2)}</title></circle>`;});
+  // R2 curve
+  let pr="";
+  path.forEach((d,i)=>{pr+=(i?"L":"M")+X(d.lam).toFixed(1)+" "+Yr(d.r2).toFixed(1)+" ";});
+  s+=`<path d="${pr}" fill="none" stroke="var(--pos)" stroke-width="2" stroke-dasharray="1 0"/>`;
+  path.forEach(d=>{s+=`<circle cx="${X(d.lam).toFixed(1)}" cy="${Yr(d.r2).toFixed(1)}" r="3" fill="var(--pos)"><title>λ=${d.lam}: R²=${d.r2.toFixed(3)}</title></circle>`;});
+  // GCV optimum marker
+  s+=`<circle cx="${X(lamBest).toFixed(1)}" cy="${Yg(path.find(d=>d.lam===lamBest).gcv).toFixed(1)}" r="6" fill="none" stroke="var(--warn)" stroke-width="2"/>`;
+  // lambda in use
+  s+=`<line x1="${X(lamUsed).toFixed(1)}" y1="${pad.t}" x2="${X(lamUsed).toFixed(1)}" y2="${pad.t+ih}" stroke="#41506b" stroke-dasharray="4 3"/>`;
+  // x labels
+  path.forEach(d=>{s+=`<text x="${X(d.lam).toFixed(1)}" y="${H-10}" text-anchor="middle" fill="#6b7686">${d.lam}</text>`;});
+  s+=`<text x="${pad.l-46}" y="${pad.t+8}" fill="var(--warn)">GCV</text>`;
+  s+=`<text x="${W-pad.r+6}" y="${pad.t-2}" fill="var(--pos)">R²</text>`;
+  s+=`<text x="${(W/2).toFixed(0)}" y="${H-1}" text-anchor="middle" fill="#9aa6b4">λ (log scale)</text>`;
+  s+=`</svg>`;
+  return s;
+}
+
+/* ---------- outputs ---------- */
+function fmt(x,d){return (x===''||x==null||isNaN(x))?'—':Number(x).toFixed(d===undefined?3:d);}
+function renderOutputs(){
+  if(!last||last.error) return;
+  document.getElementById("amosOut").textContent=buildAmos();
+  document.getElementById("lisrelOut").textContent=buildLisrel();
+  document.getElementById("lavaanOut").textContent=buildLavaan();
+}
+function buildWeightCol(){
+  if(!last||last.error) return "";
+  return items.map((it,i)=>`${it.id||('y'+(i+1))}\t${last.w[i].toFixed(4)}`).join("\n");
+}
+function buildAmos(){
+  if(!last||last.error) return "";
+  let s="AMOS steps:\n";
+  s+="1) Add a latent factor M.\n";
+  s+="2) Draw single-headed paths from M to EVERY observed item.\n";
+  s+="3) Fix each loading to the value below (Object Properties > Parameters > Regression weight).\n";
+  s+="4) Leave the VARIANCE of M FREE (do NOT fix it to 1) - it estimates the method strength phi.\n";
+  s+="5) Add covariances between M and every trait factor and FIX them to 0.\n";
+  s+="6) Re-estimate; compare structural paths and fit vs the baseline model; report phi.\n\n";
+  items.forEach((it,i)=>{ s+=`M --> ${it.id||('y'+(i+1))}   = ${last.w[i].toFixed(4)}\n`; });
+  return s;
+}
+function buildLisrel(){
+  if(!last||last.error) return "";
+  const k=items.length;
+  const q=Math.max(1,parseInt(document.getElementById("qfac").value)||1);
+  let s=`! q=${q} trait factors + 1 method factor M (last); k=${k} items\n`;
+  s+=`! All-Y model: the latent covariance matrix is PS (not PH).\n`;
+  s+=`MO NY=${k} NE=${q+1} LY=FU,FI PS=SY,FR TE=DI,FR\n`;
+  s+=`LE\n ${Array.from({length:q},(_,j)=>'ETA'+(j+1)).join(' ')} M\n`;
+  s+=`! Free LY(i,1..q) for trait loadings as in your baseline CFA.\n`;
+  s+=`! Method loadings fixed to the calibrated pattern:\n`;
+  items.forEach((it,i)=>{ s+=`VA ${last.w[i].toFixed(4)} LY(${i+1},${q+1})\n`; });
+  s+=`! PS(${q+1},${q+1}) stays FREE - it estimates the method variance phi.\n`;
+  s+=`! Orthogonality: fix M-trait covariances to zero:\n`;
+  let fi=`FI`, va=`VA 0`;
+  for(let j=1;j<=q;j++){ fi+=` PS(${q+1},${j})`; va+=` PS(${q+1},${j})`; }
+  s+=fi+`\n`+va+`\n`;
+  s+=`OU ND=3 RS MI SC\n`;
+  return s;
+}
+function buildLavaan(){
+  if(!last||last.error) return "";
+  const ids=items.map((it,i)=>it.id||('y'+(i+1)));
+  let s="# lavaan: add to your trait model string\n";
+  s+="M =~ "+ids.map((id,i)=>`${last.w[i].toFixed(4)}*${id}`).join(" + ")+"\n";
+  s+="M ~~ M          # phi free (method strength)\n";
+  s+="# fix M-trait covariances to 0, e.g.:\n";
+  s+="# M ~~ 0*F1\n# M ~~ 0*F2\n";
+  return s;
+}
+function renderOutTable(){
+  const t=document.getElementById("outTable");
+  if(!last||last.error){t.innerHTML="";return;}
+  let h="<tr><th>Item</th><th>Scale</th>";
+  last.names.forEach(e=>h+=`<th>${e}</th>`);
+  h+="<th>m<sub>i</sub></th><th>w<sub>i</sub></th></tr>";
+  items.forEach((it,i)=>{
+    h+=`<tr><td class="lab">${it.id||('y'+(i+1))}</td><td>${it.scale||''}</td>`;
+    last.Z[i].forEach(v=>h+=`<td>${fmt(v,2)}</td>`);
+    h+=`<td>${fmt(last.m[i],3)}</td><td style="font-weight:700">${fmt(last.w[i],3)}</td></tr>`;
+  });
+  t.innerHTML=h;
+}
+
+/* ---------- main recompute ---------- */
+function recompute(){
+  const lamManual=Math.pow(10,parseFloat(document.getElementById("lambda").value));
+  document.getElementById("lamVal").textContent="λ = "+lamManual.toFixed(2);
+  const res=compute();
+  last=res;
+  const card=document.getElementById("resultsCard");
+  if(!res){card.style.display="none";return;}
+  card.style.display="block";
+  if(res.error){
+    const st=document.getElementById("matStatus");
+    st.className="status err"; st.textContent=res.error;
+    return;
+  }
+  document.getElementById("gcvLam").textContent="(suggests λ = "+res.rp.best.lam+")";
+  document.getElementById("kR2").textContent=res.fit.r2.toFixed(3);
+  document.getElementById("kLam").textContent=res.fit.lam.toFixed(2);
+  document.getElementById("kK").textContent=res.k;
+  document.getElementById("kG0").textContent=res.fit.beta[0].toFixed(3);
+  document.getElementById("gammaChart").innerHTML=svgBar(res.fit.beta.slice(1),res.names,{w:440,h:210});
+  const wlabels=items.map((it,i)=>it.id||('y'+(i+1)));
+  document.getElementById("weightChart").innerHTML=svgBar(res.w,wlabels,{w:440,h:210});
+  document.getElementById("sweepChart").innerHTML=svgLamProfile(res.rp.path,res.fit.lam,res.rp.best.lam);
+  renderOutTable();
+  renderOutputs();
+}
+
+/* ---------- utilities ---------- */
+function copyText(txt){ if(!txt){toast("Nothing to copy");return;}
+  navigator.clipboard.writeText(txt).then(()=>toast("Copied ✓"),()=>{
+    const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();
+    try{document.execCommand("copy");toast("Copied ✓");}catch(e){toast("Copy failed");}ta.remove();});
+}
+let toastTimer;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),1600);}
+
+/* ---------- example ---------- */
+function loadExample(){
+  items=[
+    {id:'y1',scale:'ScaleA',Reversed:0,Page:1,Order:1,ScaleWidth:5,Polarity:1,Length:8},
+    {id:'y2',scale:'ScaleA',Reversed:1,Page:1,Order:2,ScaleWidth:5,Polarity:-1,Length:6},
+    {id:'y3',scale:'ScaleA',Reversed:0,Page:1,Order:3,ScaleWidth:5,Polarity:1,Length:11},
+    {id:'y4',scale:'ScaleA',Reversed:1,Page:2,Order:4,ScaleWidth:5,Polarity:-1,Length:5},
+    {id:'y5',scale:'ScaleB',Reversed:0,Page:2,Order:5,ScaleWidth:7,Polarity:1,Length:14},
+    {id:'y6',scale:'ScaleB',Reversed:1,Page:2,Order:6,ScaleWidth:7,Polarity:-1,Length:7},
+    {id:'y7',scale:'ScaleB',Reversed:0,Page:3,Order:7,ScaleWidth:7,Polarity:1,Length:13},
+    {id:'y8',scale:'ScaleB',Reversed:1,Page:3,Order:8,ScaleWidth:7,Polarity:-1,Length:6},
+  ];
+  const ex=[
+    [1.00, 0.22, 0.05, 0.24, 0.04,-0.18, 0.03,-0.16],
+    [0.22, 1.00, 0.18, 0.31,-0.06,-0.25,-0.05,-0.22],
+    [0.05, 0.18, 1.00, 0.16, 0.02,-0.10, 0.01,-0.08],
+    [0.24, 0.31, 0.16, 1.00,-0.08,-0.28,-0.07,-0.24],
+    [0.04,-0.06, 0.02,-0.08, 1.00, 0.14, 0.06, 0.11],
+    [-0.18,-0.25,-0.10,-0.28, 0.14, 1.00, 0.12, 0.27],
+    [0.03,-0.05, 0.01,-0.07, 0.06, 0.12, 1.00, 0.09],
+    [-0.16,-0.22,-0.08,-0.24, 0.11, 0.27, 0.09, 1.00]
+  ];
+  R=ex;
+  document.getElementById("matText").value=ex.map(r=>r.map(v=>v.toFixed(2)).join("\t")).join("\n");
+  const st=document.getElementById("matStatus");st.className="status ok";st.textContent="Parsed 8×8 matrix ✓ (example)";
+  document.getElementById("qfac").value=2;
+  renderItemTable(); recompute();
+  toast("Example loaded");
+}
+
+/* ---------- init ---------- */
+renderItemTable();
+</script>
+</body>
+</html>
